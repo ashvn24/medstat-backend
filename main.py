@@ -7,6 +7,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 import os
 import base64
+import requests
 
 app = FastAPI()
 
@@ -24,6 +25,8 @@ EMAIL_PORT = 587
 EMAIL_HOST_USER = "medistatsolutions@gmail.com"
 EMAIL_HOST_PASSWORD = "shmh sjjr pwsx zupv"
 EMAIL_FROM = "medistatsolutions@gmail.com"
+
+GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz3UNV_x43LieC8YonKjKi9bQoVGNsytKfmnjOg22QiBn_crryURzpU66AvDySUQehg-A/exec"
 
 @app.post("/send-invoice-attachment/")
 async def send_invoice_attachment(
@@ -63,4 +66,42 @@ async def send_invoice_attachment(
             server.sendmail(EMAIL_FROM, to_email, msg.as_string())
         return {"status": "sent"}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": f"Failed to send email: {e}"}) 
+        return JSONResponse(status_code=500, content={"error": f"Failed to send email: {e}"})
+
+@app.post("/update-testimonial")
+async def update_testimonial(data: dict = Body(...)):
+    row = data.get("row", 0)
+    print("row", row)
+    if row <= 1:
+        return JSONResponse(status_code=200, content={"error": "Cannot update header row"})
+    params = {
+        "action": "update",
+        "row": row,
+        "Feedback": data.get("Feedback", ""),
+        "Suggestions": data.get("Suggestions", ""),
+        "Name": data.get("Name", ""),
+        "Email": data.get("Email", "")
+    }
+    try:
+        print(f"[UPDATE] Sending params to Apps Script: {params}")
+        response = requests.get(GOOGLE_SCRIPT_URL, params=params)
+        print(f"[UPDATE] Apps Script response: {response.status_code} {response.text}")
+        return {"status": "success", "apps_script_response": response.text}
+    except Exception as e:
+        print(f"[UPDATE] Error: {e}")
+        return JSONResponse(status_code=500, content={"error": f"Failed to update testimonial: {e}"})
+
+@app.post("/delete-testimonial")
+async def delete_testimonial(data: dict = Body(...)):
+    params = {
+        "action": "delete",
+        "row": data["row"]
+    }
+    try:
+        print(f"[DELETE] Sending params to Apps Script: {params}")
+        response = requests.get(GOOGLE_SCRIPT_URL, params=params)
+        print(f"[DELETE] Apps Script response: {response.status_code} {response.text}")
+        return {"status": "success"}
+    except Exception as e:
+        print(f"[DELETE] Error: {e}")
+        return JSONResponse(status_code=500, content={"error": f"Failed to delete testimonial: {e}"}) 
