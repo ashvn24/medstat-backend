@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Body
+from fastapi import FastAPI, Body, UploadFile, Form
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import smtplib
@@ -104,4 +104,43 @@ async def delete_testimonial(data: dict = Body(...)):
         return {"status": "success"}
     except Exception as e:
         print(f"[DELETE] Error: {e}")
-        return JSONResponse(status_code=500, content={"error": f"Failed to delete testimonial: {e}"}) 
+        return JSONResponse(status_code=500, content={"error": f"Failed to delete testimonial: {e}"})
+
+@app.post("/career-application/")
+async def career_application(
+    name: str = Form(...),
+    email: str = Form(...),
+    phone: str = Form(...),
+    position: str = Form(...),
+    coverLetter: str = Form(...),
+    resume: UploadFile = None
+):
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = EMAIL_FROM
+        msg["To"] = EMAIL_FROM
+        msg["Subject"] = f"New Career Application: {position} - {name}"
+        body = f"""
+        <h2>New Career Application</h2>
+        <ul>
+          <li><b>Name:</b> {name}</li>
+          <li><b>Email:</b> {email}</li>
+          <li><b>Phone:</b> {phone}</li>
+          <li><b>Position:</b> {position}</li>
+        </ul>
+        <h3>Cover Letter</h3>
+        <p>{coverLetter.replace('\n', '<br/>')}</p>
+        """
+        msg.attach(MIMEText(body, "html"))
+        if resume:
+            file_bytes = await resume.read()
+            part = MIMEApplication(file_bytes, _subtype=resume.filename.split('.')[-1])
+            part.add_header('Content-Disposition', 'attachment', filename=resume.filename)
+            msg.attach(part)
+        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
+            server.starttls()
+            server.login(EMAIL_HOST_USER, EMAIL_HOST_PASSWORD)
+            server.sendmail(EMAIL_FROM, EMAIL_FROM, msg.as_string())
+        return {"status": "success"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"Failed to send application: {e}"}) 
